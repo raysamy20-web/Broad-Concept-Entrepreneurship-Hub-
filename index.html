@@ -1,1 +1,26 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Broad Concept Hub | Staff Requests</title><link rel="stylesheet" href="style.css"></head><body><main id="app"></main><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Broad Concept Hub | Staff Requests</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main id="app">
+    <section class="login">
+      <h1 class="brand">Broad Concept Hub</h1>
+      <h2>Staff Request Portal</h2>
+      <p class="muted">Sign in with your staff account.</p>
+      <form id="login-form">
+        <label>Username<input id="username" required autocomplete="username"></label>
+        <label>Password<input id="password" type="password" required autocomplete="current-password"></label>
+        <p class="error" id="message" role="alert"></p>
+        <button type="submit">Sign in</button>
+      </form>
+      <p class="muted">An administrator creates staff accounts.</p>
+    </section>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>

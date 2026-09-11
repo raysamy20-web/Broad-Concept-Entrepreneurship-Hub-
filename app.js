@@ -1,6 +1,59 @@
-const app=document.querySelector('#app');let me,deps=[];const api=async(p,o={})=>{let r=await fetch('/api/'+p,{...o,headers:{'content-type':'application/json',...(o.headers||{})}}),d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-function login(){app.innerHTML=`<section class="login"><h1 class="brand">Broad Concept Hub</h1><h2>Staff Request Portal</h2><p class="muted">Sign in with your staff account.</p><form id="login"><label>Username<input name="username" required></label><label>Password<input name="password" type="password" required></label><p class="error" id="err"></p><button>Sign in</button></form><p class="muted">An administrator creates staff accounts.</p></section>`;document.querySelector('#login').onsubmit=async e=>{e.preventDefault();try{await api('login',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});start()}catch(x){err.textContent=x.message}}}
-async function start(){let d=await api('me');me=d.user;deps=await api('departments').then(x=>x.items);app.innerHTML=`<div class="shell"><aside class="side"><h2>Broad Concept</h2><p>${esc(me.name)}<br><small>${esc(me.role)}</small></p><button data-v="dashboard">Dashboard</button><button data-v="new">New request</button><button data-v="requests">My requests</button>${['Administrator','Head of Operations'].includes(me.role)?'<button data-v="monitor">Monitoring</button>':''}${me.role==='Administrator'?'<button data-v="admin">Administration</button>':''}<button id="logout">Sign out</button></aside><section class="content" id="view"></section></div>`;document.querySelectorAll('[data-v]').forEach(x=>x.onclick=()=>view(x.dataset.v));logout.onclick=async()=>{await fetch('/api/logout');login()};view('dashboard')}
-async function view(v){let el=document.querySelector('#view');if(v==='dashboard'){let rs=(await api('requests')).items,open=rs.filter(x=>x.status!=='Completed'&&x.status!=='Declined'),over=open.filter(x=>x.expected_date&&new Date(x.expected_date)<new Date());el.innerHTML=`<h1>Dashboard</h1><div class="grid"><div class="card"><h2>${rs.length}</h2>Accessible requests</div><div class="card"><h2>${open.length}</h2>Open requests</div><div class="card"><h2>${over.length}</h2>Overdue requests</div></div><div class="card"><h2>What you can do</h2><p>Submit a request, view its progress, and add comments. Assigned requests appear in your request list.</p></div>`}if(v==='new'){el.innerHTML=`<h1>New request</h1><div class="card"><form id="newform"><label>Request type<select name="type" required>${(await api('me')).types.map(x=>`<option>${x}</option>`).join('')}</select></label><label>Department<select name="department_id" required>${deps.map(x=>`<option value="${x.id}" ${x.id===me.department_id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><label>Title<input name="title" required></label><label>Description<textarea name="description" required></textarea></label><label>Expected completion date<input name="expected_date" type="date"></label><p class="error" id="formerr"></p><button>Submit request</button></form></div>`;newform.onsubmit=async e=>{e.preventDefault();try{await api('requests',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});view('requests')}catch(x){formerr.textContent=x.message}}}if(['requests','monitor'].includes(v)){let rs=(await api('requests')).items;if(v==='monitor')rs=rs.filter(x=>x.status!=='Completed'&&x.status!=='Declined');el.innerHTML=`<h1>${v==='monitor'?'Operational monitoring':'My requests'}</h1><div class="card"><input id="filter" placeholder="Filter by title, type, department, or status"><div id="list"></div></div>`;let draw=()=>list.innerHTML=rs.filter(r=>JSON.stringify(r).toLowerCase().includes(filter.value.toLowerCase())).map(r=>`<div class="card row"><div><strong>${esc(r.title)}</strong><br><span class="muted">${esc(r.type)} · ${esc(r.department)} · ${esc(r.requester)}</span></div><div><span class="tag">${esc(r.status)}</span><br><button onclick="detail(${r.id})">Open</button></div></div>`).join('')||'<p class="muted">No requests match the selected filter.</p>';filter.oninput=draw;draw()}if(v==='admin'){let s=(await api('staff')).items;el.innerHTML=`<h1>Administration</h1><div class="grid"><div class="card"><h2>Add staff member</h2><form id="staffform"><input name="name" placeholder="Full name" required><input name="username" placeholder="Username" required><input name="password" type="password" placeholder="Temporary password" required><select name="role">${(await api('me')).roles.map(x=>`<option>${x}</option>`).join('')}</select><select name="department_id">${deps.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select><button>Add staff</button></form></div><div class="card"><h2>Add department</h2><form id="depform"><input name="name" placeholder="Department name" required><button>Add department</button></form></div></div><div class="card"><h2>Staff accounts</h2>${s.map(x=>`<p><strong>${esc(x.name)}</strong> · ${esc(x.role)} · ${esc(x.department||'No department')}</p>`).join('')}</div>`;staffform.onsubmit=async e=>{e.preventDefault();await api('staff',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});view('admin')};depform.onsubmit=async e=>{e.preventDefault();await api('departments',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});deps=(await api('departments')).items;view('admin')}}
-window.detail=async id=>{let d=await api('requests/'+id),r=d.request;let allowed=['Administrator','Head of Operations'].includes(me.role)||r.assigned_role===me.role||r.assignee_id===me.id;document.querySelector('#view').innerHTML=`<button onclick="view('requests')">Back</button><h1>${esc(r.title)}</h1><div class="card"><p><span class="tag">${esc(r.status)}</span> ${esc(r.type)}</p><p>${esc(r.description)}</p><p class="muted">Expected: ${esc(r.expected_date||'Not set')} · Assigned to: ${esc(r.assigned_role||'Unassigned')}</p></div>${allowed?`<div class="card"><h2>Update request</h2><form id="statusform"><select name="status">${['Submitted','Under Review','Approved','Declined','In Progress','Completed'].map(x=>`<option ${x===r.status?'selected':''}>${x}</option>`).join('')}</select><textarea name="comment" placeholder="Decision comment is required if you decline"></textarea><button>Update status</button></form>${r.type==='Leave or Absence'&&me.role==='Main Instructor'?'<button id="forward">Forward to Head of Operations</button>':''}</div>`:''}<div class="card"><h2>Comments</h2>${d.comments.map(x=>`<p><strong>${esc(x.author)}</strong><br>${esc(x.body)}</p>`).join('')||'<p class="muted">No comments yet.</p>'}<form id="commentform"><textarea name="body" required placeholder="Add a comment"></textarea><button>Add comment</button></form></div><div class="card"><h2>Activity</h2>${d.activity.map(x=>`<p>${esc(x.created_at)} · <strong>${esc(x.actor||'System')}</strong> · ${esc(x.action)} ${esc(x.details||'')}</p>`).join('')}</div>`;statusform&&(statusform.onsubmit=async e=>{e.preventDefault();try{await api('requests/'+id+'/status',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});detail(id)}catch(x){alert(x.message)}});commentform.onsubmit=async e=>{e.preventDefault();await api('requests/'+id+'/comments',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});detail(id)};forward&&(forward.onclick=async()=>{await api('requests/'+id+'/forward',{method:'POST',body:'{}'});detail(id)})};
-window.view=view;start().catch(login);
+(() => {
+  'use strict';
+  const form = document.getElementById('login-form');
+  const message = document.getElementById('message');
+  const app = document.getElementById('app');
+
+  async function api(path, options = {}) {
+    const response = await fetch(`/api/${path}`, {
+      ...options,
+      headers: { 'content-type': 'application/json', ...(options.headers || {}) }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Request failed.');
+    return data;
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>'"]/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    })[character]);
+  }
+
+  function showDashboard(user) {
+    app.innerHTML = `
+      <section class="login">
+        <h1 class="brand">Welcome, ${escapeHtml(user.name)}</h1>
+        <h2>Staff Request Portal</h2>
+        <p>You are signed in as ${escapeHtml(user.role)}.</p>
+        <p class="muted">The initial portal setup is complete. Request screens will be available after the first administrator account is configured.</p>
+        <button id="logout-button" type="button">Sign out</button>
+      </section>`;
+    document.getElementById('logout-button').addEventListener('click', async () => {
+      await fetch('/api/logout');
+      window.location.reload();
+    });
+  }
+
+  if (!form) return;
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    message.textContent = '';
+    const button = form.querySelector('button');
+    button.disabled = true;
+    try {
+      const result = await api('login', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value
+        })
+      });
+      showDashboard(result.user);
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+})();
