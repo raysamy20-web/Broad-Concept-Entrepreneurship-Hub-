@@ -1,1 +1,92 @@
-(()=>{const a=document.querySelector('#app'),api=async(p,o={})=>{const r=await fetch('/api/'+p,{...o,headers:{'content-type':'application/json',...(o.headers||{})}}),d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed.');return d},e=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let me,deps,types,statuses;const login=()=>a.innerHTML=`<section class="login"><h1 class="brand">Broad Concept Hub</h1><h2>Staff Request Portal</h2><form id="f"><label>Username<input name="username" required></label><label>Password<input name="password" type="password" required></label><p id="m" class="error"></p><button>Sign in</button></form><button id="recover">Reset administrator password</button></section>`,f.onsubmit=async x=>{x.preventDefault();try{await api('login',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(f)))});start()}catch(q){m.textContent=q.message}},recover.onclick=()=>a.innerHTML=`<section class="login"><h1 class="brand">Administrator recovery</h1><form id="rf"><label>Recovery code<input name="code" required></label><label>New password<input name="password" type="password" minlength="12" required></label><p id="rm" class="error"></p><button>Set new password</button></form></section>`,rf.onsubmit=async x=>{x.preventDefault();try{await api('recover',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(rf)))});login()}catch(q){rm.textContent=q.message}};async function start(){let d=await api('me');me=d.user;types=d.types;statuses=d.statuses;deps=(await api('departments')).items;a.innerHTML=`<div class="shell"><aside class="side"><h2>Broad Concept</h2><p>${e(me.name)}<br><small>${e(me.role)}</small></p><button data-v="home">Dashboard</button><button data-v="new">New request</button><button data-v="list">Requests</button>${['Administrator','Head of Operations'].includes(me.role)?'<button data-v="monitor">Monitoring</button>':''}${me.role==='Administrator'?'<button data-v="admin">Administration</button>':''}<button id="out">Sign out</button></aside><section class="content" id="v"></section></div>`;document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>view(b.dataset.v));out.onclick=async()=>{await fetch('/api/logout');login()};view('home')}async function view(x){if(x==='home'){let r=(await api('requests')).items,o=r.filter(q=>!['Completed','Declined'].includes(q.status));v.innerHTML=`<h1>Dashboard</h1><div class="grid"><div class="card"><h2>${r.length}</h2>Accessible requests</div><div class="card"><h2>${o.length}</h2>Open requests</div></div>`}if(x==='new')v.innerHTML=`<h1>New request</h1><div class="card"><form id="nf"><label>Type<select name="type">${types.map(q=>`<option>${q}</option>`).join('')}</select></label><label>Department<select name="department_id">${deps.map(q=>`<option value="${q.id}">${e(q.name)}</option>`).join('')}</select></label><label>Title<input name="title" required></label><label>Description<textarea name="description" required></textarea></label><label>Expected completion date<input name="expected_date" type="date"></label><p id="nm" class="error"></p><button>Submit request</button></form></div>`,nf.onsubmit=async q=>{q.preventDefault();try{await api('requests',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(nf)))});view('list')}catch(z){nm.textContent=z.message}};if(['list','monitor'].includes(x)){let r=(await api('requests')).items;if(x==='monitor')r=r.filter(q=>!['Completed','Declined'].includes(q.status));v.innerHTML=`<h1>${x==='monitor'?'Operational monitoring':'Requests'}</h1>${r.map(q=>`<div class="card row"><div><strong>${e(q.title)}</strong><br><span class="muted">${e(q.type)} · ${e(q.department)} · ${e(q.requester)}</span></div><div><span class="tag">${e(q.status)}</span><br><button onclick="openRequest(${q.id})">Open</button></div></div>`).join('')||'<div class="card">No requests found.</div>'}`}if(x==='admin'){let s=(await api('staff')).items;v.innerHTML=`<h1>Administration</h1><div class="grid"><div class="card"><h2>Add staff</h2><form id="sf"><input name="name" placeholder="Full name" required><input name="username" placeholder="Username" required><input name="password" type="password" placeholder="Temporary password, at least 12 characters" required><select name="role">${d.roles.map(q=>`<option>${q}</option>`).join('')}</select><select name="department_id">${deps.map(q=>`<option value="${q.id}">${e(q.name)}</option>`).join('')}</select><button>Add staff member</button></form></div><div class="card"><h2>Staff accounts</h2>${s.map(q=>`<p><strong>${e(q.name)}</strong> · ${e(q.role)} · ${e(q.department)}</p>`).join('')}</div></div>`;sf.onsubmit=async q=>{q.preventDefault();try{await api('staff',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(sf)))});view('admin')}catch(z){alert(z.message)}}}}window.openRequest=async id=>{let d=await api('requests/'+id),r=d.request,work=['Administrator','Head of Operations'].includes(me.role)||r.assigned_role===me.role;v.innerHTML=`<button onclick="view('list')">Back</button><h1>${e(r.title)}</h1><div class="card"><span class="tag">${e(r.status)}</span><p>${e(r.description)}</p><p class="muted">Assigned to: ${e(r.assigned_role)}</p></div>${work?`<div class="card"><form id="uf"><select name="status">${statuses.map(q=>`<option ${q===r.status?'selected':''}>${q}</option>`).join('')}</select><textarea name="comment" placeholder="Comment required to decline"></textarea><button>Update request</button></form>${r.type==='Leave or Absence'&&me.role==='Main Instructor'?'<button id="fw">Forward to Head of Operations</button>':''}</div>`:''}<div class="card"><h2>Comments</h2>${d.comments.map(q=>`<p><strong>${e(q.author)}</strong><br>${e(q.body)}</p>`).join('')}<form id="cf"><textarea name="body" required placeholder="Add comment"></textarea><button>Add comment</button></form></div><div class="card"><h2>Activity</h2>${d.activity.map(q=>`<p>${e(q.created_at)} · ${e(q.actor||'System')} · ${e(q.action)} ${e(q.details||'')}</p>`).join('')}</div>`;uf&&(uf.onsubmit=async q=>{q.preventDefault();try{await api('requests/'+id+'/status',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(uf)))});openRequest(id)}catch(z){alert(z.message)}});cf.onsubmit=async q=>{q.preventDefault();await api('requests/'+id+'/comments',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(cf)))});openRequest(id)};fw&&(fw.onclick=async()=>{await api('requests/'+id+'/forward',{method:'POST',body:'{}'});openRequest(id)})};window.view=view;start().catch(login)})();
+(() => {
+  const app = document.getElementById('app');
+
+  async function request(path, options = {}) {
+    const response = await fetch(`/api/${path}`, {
+      ...options,
+      headers: { 'content-type': 'application/json', ...(options.headers || {}) }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Request failed.');
+    return data;
+  }
+
+  function signInScreen() {
+    app.innerHTML = `
+      <section class="login">
+        <h1 class="brand">Broad Concept Hub</h1>
+        <h2>Staff Request Portal</h2>
+        <p class="muted">Sign in with your staff account.</p>
+        <form id="sign-in-form">
+          <label>Username<input id="sign-in-username" required autocomplete="username"></label>
+          <label>Password<input id="sign-in-password" type="password" required autocomplete="current-password"></label>
+          <p class="error" id="sign-in-error"></p>
+          <button type="submit">Sign in</button>
+        </form>
+        <p><button id="show-recovery" type="button">Reset administrator password</button></p>
+      </section>`;
+
+    document.getElementById('sign-in-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const error = document.getElementById('sign-in-error');
+      error.textContent = '';
+      try {
+        const user = await request('login', {
+          method: 'POST',
+          body: JSON.stringify({
+            username: document.getElementById('sign-in-username').value.trim(),
+            password: document.getElementById('sign-in-password').value
+          })
+        });
+        signedInScreen(user.user);
+      } catch (cause) {
+        error.textContent = cause.message;
+      }
+    });
+    document.getElementById('show-recovery').addEventListener('click', recoveryScreen);
+  }
+
+  function recoveryScreen() {
+    app.innerHTML = `
+      <section class="login">
+        <h1 class="brand">Administrator password reset</h1>
+        <p class="muted">Use the recovery code stored in the Cloudflare secret named ADMIN_RESET_CODE.</p>
+        <form id="recovery-form">
+          <label>Recovery code<input id="recovery-code" type="password" required autocomplete="off"></label>
+          <label>New password<input id="recovery-password" type="password" minlength="12" required autocomplete="new-password"></label>
+          <p class="error" id="recovery-error"></p>
+          <button type="submit">Set new password</button>
+        </form>
+        <p><button id="back-to-sign-in" type="button">Back to sign in</button></p>
+      </section>`;
+
+    document.getElementById('recovery-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const error = document.getElementById('recovery-error');
+      error.textContent = '';
+      try {
+        await request('recover', {
+          method: 'POST',
+          body: JSON.stringify({
+            code: document.getElementById('recovery-code').value,
+            password: document.getElementById('recovery-password').value
+          })
+        });
+        signInScreen();
+      } catch (cause) {
+        error.textContent = cause.message;
+      }
+    });
+    document.getElementById('back-to-sign-in').addEventListener('click', signInScreen);
+  }
+
+  function signedInScreen(user) {
+    app.innerHTML = `<section class="login"><h1 class="brand">Welcome, ${String(user.name).replace(/</g, '&lt;')}</h1><h2>Staff Request Portal</h2><p>You are signed in as ${String(user.role).replace(/</g, '&lt;')}.</p><p class="muted">Your administrator account is working. The request-management screens will be restored after access is confirmed.</p><button id="sign-out" type="button">Sign out</button></section>`;
+    document.getElementById('sign-out').addEventListener('click', async () => {
+      await fetch('/api/logout');
+      signInScreen();
+    });
+  }
+
+  signInScreen();
+})();
