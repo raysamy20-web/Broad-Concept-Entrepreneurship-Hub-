@@ -1,12 +1,13 @@
 const json = (data, status = 200) => Response.json(data, { status, headers: { 'cache-control': 'no-store' } });
+const HASH_ITERATIONS = 100000;
 const hex = value => [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 
 async function createPasswordHash(password) {
   const saltBytes = crypto.getRandomValues(new Uint8Array(16));
   const salt = hex(saltBytes);
   const passwordKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 210000, hash: 'SHA-256' }, passwordKey, 256);
-  return `pbkdf2$210000$${salt}$${hex(bits)}`;
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: HASH_ITERATIONS, hash: 'SHA-256' }, passwordKey, 256);
+  return `pbkdf2$${HASH_ITERATIONS}$${salt}$${hex(bits)}`;
 }
 
 export async function onRequestPost({ request, env }) {
