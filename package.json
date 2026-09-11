@@ -1,0 +1,1 @@
+{"name":"staff-request-portal","private":true,"version":"0.1.0","scripts":{"dev":"wrangler pages dev . --d1=PORTAL_DB","deploy":"wrangler pages deploy .","db:init":"wrangler d1 execute staff-request-portal --file=./schema.sql"},"devDependencies":{"wrangler":"^4.0.0"}}
