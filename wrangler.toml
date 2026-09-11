@@ -1,0 +1,7 @@
+name = "staff-request-portal"
+compatibility_date = "2026-09-11"
+
+[[d1_databases]]
+binding = "PORTAL_DB"
+database_name = "staff-request-portal"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
