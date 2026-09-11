@@ -1,59 +1,9 @@
 (() => {
-  'use strict';
-  const form = document.getElementById('login-form');
-  const message = document.getElementById('message');
-  const app = document.getElementById('app');
-
-  async function api(path, options = {}) {
-    const response = await fetch(`/api/${path}`, {
-      ...options,
-      headers: { 'content-type': 'application/json', ...(options.headers || {}) }
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Request failed.');
-    return data;
-  }
-
-  function escapeHtml(value) {
-    return String(value || '').replace(/[&<>'"]/g, character => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-    })[character]);
-  }
-
-  function showDashboard(user) {
-    app.innerHTML = `
-      <section class="login">
-        <h1 class="brand">Welcome, ${escapeHtml(user.name)}</h1>
-        <h2>Staff Request Portal</h2>
-        <p>You are signed in as ${escapeHtml(user.role)}.</p>
-        <p class="muted">The initial portal setup is complete. Request screens will be available after the first administrator account is configured.</p>
-        <button id="logout-button" type="button">Sign out</button>
-      </section>`;
-    document.getElementById('logout-button').addEventListener('click', async () => {
-      await fetch('/api/logout');
-      window.location.reload();
-    });
-  }
-
-  if (!form) return;
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    message.textContent = '';
-    const button = form.querySelector('button');
-    button.disabled = true;
-    try {
-      const result = await api('login', {
-        method: 'POST',
-        body: JSON.stringify({
-          username: document.getElementById('username').value,
-          password: document.getElementById('password').value
-        })
-      });
-      showDashboard(result.user);
-    } catch (error) {
-      message.textContent = error.message;
-    } finally {
-      button.disabled = false;
-    }
-  });
+  const app=document.getElementById('app');
+  const api=async(path,options={})=>{const response=await fetch(`/api/${path}`,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||'Request failed.');return data};
+  const departments=async()=>{const response=await fetch('/api/departments');if(!response.ok)return [];return (await response.json()).items||[]};
+  function setup(deps){app.innerHTML=`<section class="login"><h1 class="brand">Broad Concept Hub</h1><h2>Create the first administrator account</h2><p class="muted">This secure one-time step enables portal administration.</p><form id="setup-form"><label>Full name<input id="name" required></label><label>Username<input id="username" required autocomplete="username"></label><label>New password<input id="password" type="password" required minlength="12" autocomplete="new-password"></label><label>Department<select id="department">${deps.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')}</select></label><p class="error" id="message"></p><button>Create administrator account</button></form></section>`;document.getElementById('setup-form').onsubmit=async e=>{e.preventDefault();try{await api('setup',{method:'POST',body:JSON.stringify({name:name.value,username:username.value,password:password.value,department_id:department.value})});login()}catch(error){message.textContent=error.message}}}
+  function login(){app.innerHTML=`<section class="login"><h1 class="brand">Broad Concept Hub</h1><h2>Staff Request Portal</h2><p class="muted">Sign in with your staff account.</p><form id="login-form"><label>Username<input id="username" required autocomplete="username"></label><label>Password<input id="password" type="password" required autocomplete="current-password"></label><p class="error" id="message"></p><button>Sign in</button></form></section>`;document.getElementById('login-form').onsubmit=async e=>{e.preventDefault();try{const result=await api('login',{method:'POST',body:JSON.stringify({username:username.value,password:password.value})});dashboard(result.user)}catch(error){message.textContent=error.message}}}
+  function dashboard(user){app.innerHTML=`<section class="login"><h1 class="brand">Welcome, ${user.name}</h1><h2>Staff Request Portal</h2><p>You are signed in as ${user.role}.</p><p class="muted">Your administrator account is ready. The request workflow will be enabled in the next application update.</p><button id="logout">Sign out</button></section>`;document.getElementById('logout').onclick=async()=>{await fetch('/api/logout');login()}}
+  (async()=>{const deps=await departments();if(!deps.length){app.innerHTML='<section class="login"><h1 class="brand">Broad Concept Hub</h1><p class="error">The portal database is not ready. Add the department records in D1 first.</p></section>';return}try{const result=await api('me');dashboard(result.user)}catch{setup(deps)}})();
 })();
